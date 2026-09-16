@@ -12,7 +12,6 @@ export type SheetsConfig = {
   spreadsheetId?: string
   credentialsJson?: string
   credentialsPath?: string
-  bookingsSheetName: string
   configSheetName: string
 }
 
@@ -21,7 +20,6 @@ export function getSheetsConfig(): SheetsConfig {
     spreadsheetId: process.env.SPREADSHEET_ID,
     credentialsJson: process.env.GOOGLE_CREDENTIALS_JSON,
     credentialsPath: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    bookingsSheetName: process.env.BOOKINGS_SHEET_NAME || 'Bookings',
     configSheetName: process.env.CONFIG_SHEET_NAME || 'Config',
   }
 }

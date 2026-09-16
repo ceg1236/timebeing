@@ -32,8 +32,11 @@ export async function POST(req: NextRequest) {
     const charge = event.data.object as Stripe.Charge
     const paymentIntentId =
       typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id
-    if (paymentIntentId) {
-      await markBookingRefunded(paymentIntentId)
+    const eventSlug = charge.metadata?.eventSlug
+    if (paymentIntentId && eventSlug) {
+      await markBookingRefunded(paymentIntentId, eventSlug)
+    } else {
+      console.error('[webhook] charge.refunded missing paymentIntentId or eventSlug metadata:', charge.id)
     }
     return NextResponse.json({ received: true })
   }
@@ -53,7 +56,7 @@ export async function POST(req: NextRequest) {
     typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id ?? session.id
 
   // Idempotency: Stripe can retry webhook delivery, so skip if we've already recorded this payment.
-  const existingIds = await getExistingPaymentIds()
+  const existingIds = await getExistingPaymentIds(metadata.eventSlug)
   if (existingIds?.includes(paymentId)) {
     console.log('[webhook] payment already recorded, skipping:', paymentId)
     return NextResponse.json({ received: true })

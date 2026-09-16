@@ -46,6 +46,60 @@ export function extractErrorMessage(err: unknown): string {
   return String(err)
 }
 
+/** True if `err` is the Sheets API's "that tab doesn't exist" error, e.g. from a bad range. */
+export function isMissingSheetError(err: unknown): boolean {
+  return extractErrorMessage(err).includes('Unable to parse range')
+}
+
+/**
+ * Header row for a per-event Bookings tab. Column order must match the row
+ * built in sheets-bookings.ts's appendBooking.
+ */
+export const BOOKINGS_HEADER_ROW = [
+  'Timestamp',
+  'Name',
+  'Email',
+  'EventSlug',
+  'DateId',
+  'DateLabel',
+  'TierLabel',
+  'Quantity',
+  'AmountPaid',
+  'PaymentId',
+  'Refunded',
+  'Notes',
+]
+
+/** Each event gets its own Bookings tab, named after its slug (event slugs are already tab-safe). */
+export function bookingsTabName(eventSlug: string): string {
+  return eventSlug
+}
+
+/** Creates the event's Bookings tab with its header row, if it doesn't already exist. */
+export async function ensureBookingsTab(
+  sheets: sheets_v4.Sheets,
+  spreadsheetId: string,
+  sheetName: string
+): Promise<void> {
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: 'sheets.properties.title',
+  })
+  const exists = (meta.data.sheets ?? []).some((s) => s.properties?.title === sheetName)
+  if (exists) return
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: { requests: [{ addSheet: { properties: { title: sheetName } } }] },
+  })
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!A1:L1`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [BOOKINGS_HEADER_ROW] },
+  })
+}
+
 /**
  * Appends a row to the first empty data row (i.e. after any existing rows),
  * rather than relying on the Sheets API's own append, which can behave
