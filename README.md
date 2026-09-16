@@ -20,10 +20,12 @@ Open [http://localhost:3000](http://localhost:3000).
 Each event is a config file under `content/events/`. A guest picks a date and
 ticket tier on the event's page, which calls `/api/checkout` to create a
 Stripe Checkout session; after payment, Stripe calls `/api/webhooks/stripe`,
-which writes the booking to a "Bookings" tab in a Google Sheet (the
-spreadsheet is the database — no separate admin screen) and emails a
-confirmation if Resend is configured. Capacity per date lives in a "Config"
-tab on the same spreadsheet and is edited directly there.
+which writes the booking to that event's own Bookings tab in a Google Sheet
+(one spreadsheet, forever — each event gets a tab named after its slug,
+auto-created on its first booking; the spreadsheet is the database, no
+separate admin screen) and emails a confirmation if Resend is configured.
+Capacity per date lives in a shared "Config" tab on the same spreadsheet,
+across all events, and is edited directly there.
 
 **Known, accepted tradeoff:** the capacity check at checkout time isn't
 perfectly atomic — if two people try to book the very last seat within the

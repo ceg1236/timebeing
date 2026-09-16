@@ -1,14 +1,14 @@
 /**
- * Combines capacity (Config tab) with sold counts (Bookings tab) to answer
- * "how many seats are left for this date." Refunded bookings don't count
- * against capacity.
+ * Combines capacity (shared Config tab) with sold counts (that event's own
+ * Bookings tab) to answer "how many seats are left for this date." Refunded
+ * bookings don't count against capacity.
  *
- * Bookings tab columns (see lib/sheets-append.ts for the writer):
+ * Bookings tab columns (see lib/sheets-client.ts for the writer):
  * A Timestamp | B Name | C Email | D EventSlug | E DateId | F DateLabel |
  * G TierLabel | H Quantity | I AmountPaid | J PaymentId | K Refunded | L Notes
  */
 
-import { getSheetsClient, extractErrorMessage } from './sheets-client'
+import { getSheetsClient, extractErrorMessage, isMissingSheetError, bookingsTabName } from './sheets-client'
 import { getSheetsConfig } from './payment-env'
 import { getCapacityFromSheet, resolveCapacity } from './sheets-capacity'
 import type { EventDate } from '../content/event-schema'
@@ -31,9 +31,10 @@ const REFUNDED_COL = 10 // K
  * that as "no live data available yet" rather than "sold out."
  */
 export async function getAvailabilityForDates(
-  dates: readonly EventDate[]
+  dates: readonly EventDate[],
+  eventSlug: string
 ): Promise<DateAvailability[] | null> {
-  const { spreadsheetId, bookingsSheetName } = getSheetsConfig()
+  const { spreadsheetId } = getSheetsConfig()
   if (!spreadsheetId) return null
 
   const capacityFromSheet = await getCapacityFromSheet()
@@ -49,10 +50,11 @@ export async function getAvailabilityForDates(
     })
   }
 
+  const sheetName = bookingsTabName(eventSlug)
   try {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${bookingsSheetName}!A2:L`,
+      range: `${sheetName}!A2:L`,
     })
     const rows = (res.data.values ?? []) as string[][]
 
@@ -72,6 +74,13 @@ export async function getAvailabilityForDates(
       return { dateId: d.id, capacity, sold, remaining, soldOut: remaining <= 0 }
     })
   } catch (err) {
+    if (isMissingSheetError(err)) {
+      // This event's Bookings tab doesn't exist yet — no sales recorded so far.
+      return dates.map((d) => {
+        const capacity = capacityByDateId[d.id] ?? d.fallbackCapacity
+        return { dateId: d.id, capacity, sold: 0, remaining: capacity, soldOut: capacity <= 0 }
+      })
+    }
     console.error('[sheets-availability] getAvailabilityForDates failed:', extractErrorMessage(err))
     return null
   }

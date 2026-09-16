@@ -8,7 +8,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
   const event = getEventConfig(slug)
   if (!event) notFound()
 
-  const availability = await getAvailabilityForDates(event.dates)
+  const availability = await getAvailabilityForDates(event.dates, event.slug)
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">

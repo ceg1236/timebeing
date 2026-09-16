@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
   // rare, given typical event sizes) for two people to both pass this check
   // for the last seat. That's an accepted tradeoff — see README — rather
   // than adding a database purely to make this atomic.
-  const availability = await getAvailabilityForDates(event.dates)
+  const availability = await getAvailabilityForDates(event.dates, event.slug)
   if (availability) {
     const dateAvail = availability.find((a) => a.dateId === date.id)
     if (dateAvail?.soldOut) {
@@ -129,6 +129,12 @@ export async function POST(req: NextRequest) {
         name: trimmedName,
         email: trimmedEmail,
         notes: notes.slice(0, 500),
+      },
+      // Also stamped on the PaymentIntent (and from there, the Charge) so the
+      // charge.refunded webhook — which only gets the charge, not this
+      // session — still knows which event's Bookings tab to update.
+      payment_intent_data: {
+        metadata: { eventSlug: event.slug },
       },
       customer_email: trimmedEmail,
       success_url: successUrl,
